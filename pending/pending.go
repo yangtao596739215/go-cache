@@ -17,13 +17,6 @@ var ErrEntityType = errors.New("pendingCache get entity type error")
 var ErrTimeOut = errors.New("pendingCache get entity timeout")
 var ErrPendingGetWrong = errors.New("pending get wrong result")
 
-const (
-	CacheSize     = 20000
-	ItemsToPrune  = 500
-	ExpireSecends = 10 * time.Second
-	TimeoutSecond = 300 * time.Millisecond
-)
-
 type Entity struct {
 	Res   interface{}
 	ready chan struct{}

@@ -30,7 +30,7 @@ func mockWrongValue() (interface{}, error) {
 	return nil, nil
 }
 
-//第一次调用返回错误
+//第一次调用返回错误,之后返回正确
 func mockSecond() (interface{}, error) {
 	if count == 0 {
 		count++
