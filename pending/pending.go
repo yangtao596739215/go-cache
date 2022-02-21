@@ -2,6 +2,7 @@ package pending
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -54,16 +55,19 @@ func NewPendingCache(size int64, prune uint32) *PendingCache {
 }
 
 //返回isHit，方便业务层知道是否命中了缓存
-func (pCache *PendingCache) get(L ILogger, key string, f PendingProducer) (e *Entity, isHit bool, err error) {
+func (pCache *PendingCache) get(L ILogger, key string, f PendingProducer, timeout, expired time.Duration) (e *Entity, isHit bool, err error) {
 	// 1. Lock
 	pCache.mu.Lock() //pending的锁和map的锁分开，不加这个锁会导致大量的NotFound进入
+	fmt.Println("pcache lock")
 	// 2. FindItem
 	v, isFound := pCache.cache.Get(key)
 	if !isFound { //NotFound
+		fmt.Println("not found")
 		isHit = false
 		e = NewEntity() //这里要存指针
-		pCache.cache.Set(key, e, ExpireSecends)
+		pCache.cache.Set(key, e, expired)
 		pCache.mu.Unlock()
+		fmt.Println("pcache unlock")
 
 		errChan := make(chan error)
 		resChan := make(chan interface{})
@@ -77,13 +81,15 @@ func (pCache *PendingCache) get(L ILogger, key string, f PendingProducer) (e *En
 			close(e.ready)
 			pCache.cache.Del(key)
 			return nil, isHit, err
-		case <-time.After(time.Duration(TimeoutSecond)): //超时（关闭chan，释放pending） （del key，让下一个进来的请求重新获取）【超时时间要根据异步rpc的耗时来算，一般设置成两次+buffer】
+		case <-time.After(timeout): //超时（关闭chan，释放pending） （del key，让下一个进来的请求重新获取）【超时时间要根据异步rpc的耗时来算，一般设置成两次+buffer】
 			L.INFO("pendingCache get entity timeout")
 			close(e.ready)
 			pCache.cache.Del(key)
 			return nil, isHit, ErrTimeOut
 		}
 	} else { //Found
+		fmt.Println("found")
+
 		isHit = true
 		pCache.mu.Unlock()
 		ok := false
